@@ -60,6 +60,15 @@ Instruction instructions[INST_MAX] = {
     {MOV, 3, 1},    // R3=>c = a ，让c的初始值等于 a
     {ADD, 3, 2},    // R3=>c = c + b , 此时 c 等于 a+b
     {PRINT_INT, 3}, // 打印 R3寄存器 也就是 c 的值
+    {EXIT, 0},      // 退出执行
+};
+
+Instruction instructions2[INST_MAX] = {
+    {LOAD, 1, 100}, // R1=>a = 100
+    {LOAD, 2, 99},  // R2=>b = 99
+    {MOV, 3, 1},    // R3=>c = a ，让c的初始值等于 a
+    {ADD, 3, 2},    // R3=>c = c + b , 此时 c 等于 a+b
+    {PRINT_INT, 3}, // 打印 R3寄存器 也就是 c 的值
     {ASSERT_INT, 3, 199}, // 断言R3的值为199
     
     // 测试减法指令
@@ -425,7 +434,40 @@ int vm(Instruction *insts, int instMax)
     printf("vm end exit\n");
     return 0;
 }
+void NasmWin64Output(Instruction insts[], int count, char *filename) {
+        FILE *fp = fopen(filename, "w");
+    if (!fp) {
+        perror("Failed to open output file");
+        return;
+    }
+    fprintf(fp, "section  .data\n");
+    fprintf(fp, "    format db \"%%d\", 10, 0  ; Format string for printf\n");
+    
+    fprintf(fp,"section .bss\n");
+    fprintf(fp,"    reg resd 8 ; Reserve space for 8 double words (4 bytes each)\n");
 
+    fprintf(fp, "section .text\n");
+    fprintf(fp,"    extern printf           ; Declare external printf function\n");
+    fprintf(fp,"    global main\n");
+
+    fprintf(fp,"main:\n");
+    fprintf(fp,"    push rbp                ; Save caller's base pointer\n");
+    fprintf(fp,"    mov rbp, rsp            ; Set current function's base pointer\n");
+
+    fprintf(fp,"    mov dword [rel reg + 4], 1  ; reg[1] = 1 (each element is 4 bytes, offset is 4)\n");
+
+    fprintf(fp,"    ; Call printf to output reg[0]\n");
+    fprintf(fp,"    mov rcx, format        ; First parameter: format string\n");
+    fprintf(fp,"    mov edx, dword [rel reg+4*1]  ; Second parameter: value of reg[1]\n");
+    fprintf(fp,"    call printf\n");
+
+    fprintf(fp,"    ; Clean up stack and return\n");
+    fprintf(fp,"    mov rsp, rbp            ; Restore stack pointer\n");
+    fprintf(fp,"    pop rbp                 ; Restore base pointer\n");
+    fprintf(fp,"    mov eax, 0              ; Set return value to 0\n");
+    fprintf(fp,"    ret\n");
+    fclose(fp);
+}
 void AsmOutput(Instruction insts[], int count, char *filename) {
     FILE *fp = fopen(filename, "w");
     if (!fp) {
@@ -439,7 +481,7 @@ void AsmOutput(Instruction insts[], int count, char *filename) {
     fprintf(fp, "global _main\n\n");
     
     // .data段定义 - 使用更简单的数据结构
-    fprintf(fp, ".data\n");
+    fprintf(fp, "section  .data\n");
     fprintf(fp, "fmt_int:    db 'R%%d = %%d\\r\\n', 0\n");
     fprintf(fp, "fmt_float:  db 'FR%%d = %%f\\r\\n', 0\n");
     fprintf(fp, "fmt_assert: db 'ASSERTION FAILED\\r\\n', 0\n");
@@ -720,7 +762,7 @@ int main(void)
     
     // 生成NASM汇编代码
     printf("Generating NASM assembly code...\n");
-    AsmOutput(instructions, INST_MAX, "out.asm");
+    NasmWin64Output(instructions, INST_MAX, "out.asm");
     printf("Assembly generation complete.\n");
     
     // 运行虚拟机

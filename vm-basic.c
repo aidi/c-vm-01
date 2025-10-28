@@ -240,24 +240,12 @@ int vm(Instruction *insts, int instMax)
             }
             break;
         case CALL: // 函数调用
-        {
-            int targetPc;
-            if (insts[pc].label != NULL) {
-                // 使用dest字段中的标签位置
-                targetPc = insts[pc].dest;
-                printf("CALL \tjump to label '%s' at position %d\n", 
-                       insts[pc].label, targetPc);
-            } else {
-                // 使用传统的src字段作为跳转目标
-                targetPc = insts[pc].src;
-                printf("CALL \tjump to %d \n", targetPc);
-            }
             // 保存返回地址到栈
             stack[sp++] = pc + 1;
-            // 跳转到函数地址
-            pc = targetPc - 1;
+            printf("CALL \tjump to position %d\n", insts[pc].dest);
+            // 设置PC为目标位置
+            pc = insts[pc].dest - 1;
             break;
-        }
         case RET: // 函数返回
             printf("RET \treturn from function\n");
             if (sp >= 1) {

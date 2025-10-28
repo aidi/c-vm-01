@@ -1,16 +1,21 @@
 #include <stdio.h>
 int regisers[256]; // 寄存器数组，一共256个寄存器
+int stack[1024];   // 栈，用于函数调用保存返回地址
+int sp = 0;        // 栈指针
 // 虚拟机指令 OpCode
 typedef enum
 {
-    MOV = 1,   // 寄存器之间赋值
-    ADD,       // 寄存器加法
-    SUB,       // 寄存器减法
-    MUL,       // 寄存器乘法
-    DIV,       // 寄存器除法
-    LOAD,      // 寄存器赋值
-    PRINT_INT, // 打印寄存器的值
-    EXIT,      // 退出执行
+    MOV = 1,      // 寄存器之间赋值
+    ADD,          // 寄存器加法
+    SUB,          // 寄存器减法
+    MUL,          // 寄存器乘法
+    DIV,          // 寄存器除法
+    LOAD,         // 寄存器赋值
+    PRINT_INT,    // 打印寄存器的值
+    ASSERT_INT,   // 断言寄存器值是否符合预期
+    CALL,         // 函数调用
+    RET,          // 函数返回
+    EXIT,         // 退出执行
 } OpCode;
 // 指令结构 Instruction
 typedef struct
@@ -27,23 +32,41 @@ Instruction instructions[INST_MAX] = {
     {MOV, 3, 1},    // R3=>c = a ，让c的初始值等于 a
     {ADD, 3, 2},    // R3=>c = c + b , 此时 c 等于 a+b
     {PRINT_INT, 3}, // 打印 R3寄存器 也就是 c 的值
+    {ASSERT_INT, 3, 199}, // 断言R3的值为199
     
     // 测试减法指令
     {MOV, 4, 1},    // R4 = R1
     {SUB, 4, 2},    // R4 = R4 - R2
     {PRINT_INT, 4}, // 打印减法结果
+    {ASSERT_INT, 4, 1},   // 断言R4的值为1
     
     // 测试乘法指令
     {MOV, 5, 1},    // R5 = R1
     {MUL, 5, 2},    // R5 = R5 * R2
     {PRINT_INT, 5}, // 打印乘法结果
+    {ASSERT_INT, 5, 9900}, // 断言R5的值为9900
     
     // 测试除法指令
     {MOV, 6, 1},    // R6 = R1
     {DIV, 6, 2},    // R6 = R6 / R2
     {PRINT_INT, 6}, // 打印除法结果
+    {ASSERT_INT, 6, 1},   // 断言R6的值为1
+    
+    // 测试函数调用
+    {LOAD, 7, 5},   // 设置函数参数 R7 = 5
+    {LOAD, 8, 3},   // 设置函数参数 R8 = 3
+    {CALL, 0, 24},  // 调用函数，函数起始位置在索引24
+    {PRINT_INT, 9}, // 打印函数返回值
+    {ASSERT_INT, 9, 15},  // 断言函数返回值为15
     
     {EXIT, 3},      // 退出执行，返回值位R3寄存器里的值
+    
+    // 函数定义：计算两个数的乘积
+    // 输入：R7, R8
+    // 输出：R9
+    {MOV, 9, 7},    // R9 = R7
+    {MUL, 9, 8},    // R9 = R9 * R8
+    {RET, 0, 0},    // 返回
 };
 // 虚拟机执行 vm 函数 ，insts 为指令序列数组(传入数组名)，为 instMax数组大小
 int vm(Instruction *insts, int instMax)
@@ -76,6 +99,33 @@ int vm(Instruction *insts, int instMax)
         case DIV: // 寄存器除法
             printf("DIV \tR%d /= R%d \n", insts[pc].dest, insts[pc].src);
             regisers[insts[pc].dest] = regisers[insts[pc].dest] / regisers[insts[pc].src];
+            break;
+        case ASSERT_INT: // 断言寄存器值是否符合预期
+            printf("ASSERT_INT \tR%d == %d ", insts[pc].dest, insts[pc].src);
+            if (regisers[insts[pc].dest] == insts[pc].src) {
+                printf("R%d = %d OK\n", insts[pc].dest, regisers[insts[pc].dest]);
+            } else {
+                printf("ERROR: R%d = %d != %d\n", insts[pc].dest, regisers[insts[pc].dest], insts[pc].src);
+                printf("Assertion failed at instruction %d\n", pc);
+                return -1;
+            }
+            break;
+        case CALL: // 函数调用
+            printf("CALL \tjump to %d \n", insts[pc].src);
+            // 保存返回地址到栈
+            stack[sp++] = pc + 1;
+            // 跳转到函数地址
+            pc = insts[pc].src - 1; // 减1是因为循环结束后会pc++
+            break;
+        case RET: // 函数返回
+            printf("RET \treturn from function\n");
+            if (sp > 0) {
+                // 从栈中弹出返回地址并跳转
+                pc = stack[--sp] - 1; // 减1是因为循环结束后会pc++
+            } else {
+                printf("Error: Stack underflow\n");
+                return -1;
+            }
             break;
         case PRINT_INT: // 打印寄存器的值
             printf("PRINT_INT \tR%d ==> %d \n", insts[pc].dest, regisers[insts[pc].dest]);

@@ -33,7 +33,7 @@ main:
     call printf
     ; FLOAD: FR1 = 3.141593
     mov dword [rel freg+1*4], 0x40490FDA           ; FR1 = 3.141593
-    ; PRINT_FLOAT:  R1 = ?
+    ; PRINT_FLOAT:  FR1 = ?
     mov rcx, float_format        ; First parameter: format string
     movss xmm0, [rel freg+1*4]    ; second param 
     cvtss2sd xmm0, xmm0  

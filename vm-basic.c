@@ -505,10 +505,10 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
                 break;
             case PRINT_FLOAT:
                 // 最简单的加载方式
-                fprintf(fp,"    ; PRINT_FLOAT:  R%d = ?\n", insts[i].dest);
+                fprintf(fp,"    ; PRINT_FLOAT:  FR%d = ?\n", insts[i].dest);
                 fprintf(fp,"    mov rcx, float_format        ; First parameter: format string\n");
                 fprintf(fp,"    movss xmm0, [rel freg+%d*4]    ; second param \n",insts[i].dest);
-                fprintf(fp,"    cvtss2sd xmm0, xmm0  \n");
+                fprintf(fp,"    cvtss2sd xmm0, xmm0  \n");//float 转 double 
                 fprintf(fp,"    movq rdx, xmm0   \n");
                 fprintf(fp,"    call printf\n");
                 break;

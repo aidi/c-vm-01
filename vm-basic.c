@@ -17,6 +17,8 @@ typedef enum
     RET,          // 函数返回
     EXIT,         // 退出执行
     LABEL,        // 标签定义
+    PUSH,         // 将寄存器值压入栈
+    POP           // 从栈弹出值到寄存器
 } OpCode;
 // 指令结构 Instruction
 typedef struct
@@ -55,9 +57,9 @@ Instruction instructions[INST_MAX] = {
     {ASSERT_INT, 6, 1},   // 断言R6的值为1
     
     // 测试函数调用 - 使用标准参数传递约定
-    // 先保存R1和R2的原始值到临时寄存器
-    {MOV, 7, 1},    // 保存R1原始值到R7
-    {MOV, 8, 2},    // 保存R2原始值到R8
+    // 使用PUSH指令保存R1和R2的原始值
+    {PUSH, 1},      // 保存R1原始值到栈
+    {PUSH, 2},      // 保存R2原始值到栈
     
     // 测试加法函数
     {LOAD, 1, 5},   // 设置函数参数 R1 = 5
@@ -66,44 +68,60 @@ Instruction instructions[INST_MAX] = {
     {PRINT_INT, 0}, // 打印函数返回值（保存在R0）
     {ASSERT_INT, 0, 8},   // 断言函数返回值为8
     
+    // 使用POP指令恢复R2和R1的原始值（注意顺序）
+    {POP, 2},       // 恢复R2原始值
+    {POP, 1},       // 恢复R1原始值
+    
     // 验证寄存器是否被正确恢复
     {ASSERT_INT, 1, 100}, // 断言R1恢复为100
     {ASSERT_INT, 2, 99},  // 断言R2恢复为99
     
     // 测试减法函数
-    {MOV, 7, 1},    // 保存R1原始值到R7
-    {MOV, 8, 2},    // 保存R2原始值到R8
+    {PUSH, 1},      // 保存R1原始值到栈
+    {PUSH, 2},      // 保存R2原始值到栈
     {LOAD, 1, 10},  // 设置函数参数 R1 = 10
     {LOAD, 2, 4},   // 设置函数参数 R2 = 4
     {CALL, 0, 0, "sub"},  // 调用减法函数
     {PRINT_INT, 0}, // 打印函数返回值
     {ASSERT_INT, 0, 6},   // 断言函数返回值为6
     
+    // 恢复寄存器值
+    {POP, 2},       // 恢复R2原始值
+    {POP, 1},       // 恢复R1原始值
+    
     // 验证寄存器是否被正确恢复
     {ASSERT_INT, 1, 100}, // 断言R1恢复为100
     {ASSERT_INT, 2, 99},  // 断言R2恢复为99
     
     // 测试乘法函数
-    {MOV, 7, 1},    // 保存R1原始值到R7
-    {MOV, 8, 2},    // 保存R2原始值到R8
+    {PUSH, 1},      // 保存R1原始值到栈
+    {PUSH, 2},      // 保存R2原始值到栈
     {LOAD, 1, 6},   // 设置函数参数 R1 = 6
     {LOAD, 2, 7},   // 设置函数参数 R2 = 7
     {CALL, 0, 0, "mul"},  // 调用乘法函数
     {PRINT_INT, 0}, // 打印函数返回值
     {ASSERT_INT, 0, 42},  // 断言函数返回值为42
     
+    // 恢复寄存器值
+    {POP, 2},       // 恢复R2原始值
+    {POP, 1},       // 恢复R1原始值
+    
     // 验证寄存器是否被正确恢复
     {ASSERT_INT, 1, 100}, // 断言R1恢复为100
     {ASSERT_INT, 2, 99},  // 断言R2恢复为99
     
     // 测试除法函数
-    {MOV, 7, 1},    // 保存R1原始值到R7
-    {MOV, 8, 2},    // 保存R2原始值到R8
+    {PUSH, 1},      // 保存R1原始值到栈
+    {PUSH, 2},      // 保存R2原始值到栈
     {LOAD, 1, 20},  // 设置函数参数 R1 = 20
     {LOAD, 2, 5},   // 设置函数参数 R2 = 5
     {CALL, 0, 0, "div"},  // 调用除法函数
     {PRINT_INT, 0}, // 打印函数返回值
     {ASSERT_INT, 0, 4},   // 断言函数返回值为4
+    
+    // 恢复寄存器值
+    {POP, 2},       // 恢复R2原始值
+    {POP, 1},       // 恢复R1原始值
     
     // 验证寄存器是否被正确恢复
     {ASSERT_INT, 1, 100}, // 断言R1恢复为100
@@ -203,6 +221,24 @@ int vm(Instruction *insts, int instMax)
                 return -1;
             }
             break;
+        case PUSH: // 将寄存器值压入栈
+            printf("PUSH \tR%d = %d\n", insts[pc].dest, regisers[insts[pc].dest]);
+            if (sp < 1024) {
+                stack[sp++] = regisers[insts[pc].dest];
+            } else {
+                printf("Error: Stack overflow\n");
+                return -1;
+            }
+            break;
+        case POP: // 从栈弹出值到寄存器
+            if (sp > 0) {
+                regisers[insts[pc].dest] = stack[--sp];
+                printf("POP \tR%d = %d\n", insts[pc].dest, regisers[insts[pc].dest]);
+            } else {
+                printf("Error: Stack underflow\n");
+                return -1;
+            }
+            break;
         case CALL: // 函数调用
         {
             int targetPc;
@@ -218,19 +254,13 @@ int vm(Instruction *insts, int instMax)
             }
             // 保存返回地址到栈
             stack[sp++] = pc + 1;
-            // 保存R1和R2的原始值到栈（从R7和R8恢复）
-            stack[sp++] = regisers[8]; // 保存R2原始值
-            stack[sp++] = regisers[7]; // 保存R1原始值
             // 跳转到函数地址
             pc = targetPc - 1;
             break;
         }
         case RET: // 函数返回
             printf("RET \treturn from function\n");
-            if (sp >= 3) {
-                // 恢复R1和R2的值
-                regisers[1] = stack[--sp];
-                regisers[2] = stack[--sp];
+            if (sp >= 1) {
                 // 从栈中弹出返回地址并跳转
                 pc = stack[--sp] - 1;
             } else {

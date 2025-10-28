@@ -5,7 +5,9 @@ typedef enum
 {
     MOV = 1,   // 寄存器之间赋值
     ADD,       // 寄存器加法
-    SUB,       // 寄存器‍减法
+    SUB,       // 寄存器减法
+    MUL,       // 寄存器乘法
+    DIV,       // 寄存器除法
     LOAD,      // 寄存器赋值
     PRINT_INT, // 打印寄存器的值
     EXIT,      // 退出执行
@@ -25,6 +27,22 @@ Instruction instructions[INST_MAX] = {
     {MOV, 3, 1},    // R3=>c = a ，让c的初始值等于 a
     {ADD, 3, 2},    // R3=>c = c + b , 此时 c 等于 a+b
     {PRINT_INT, 3}, // 打印 R3寄存器 也就是 c 的值
+    
+    // 测试减法指令
+    {MOV, 4, 1},    // R4 = R1
+    {SUB, 4, 2},    // R4 = R4 - R2
+    {PRINT_INT, 4}, // 打印减法结果
+    
+    // 测试乘法指令
+    {MOV, 5, 1},    // R5 = R1
+    {MUL, 5, 2},    // R5 = R5 * R2
+    {PRINT_INT, 5}, // 打印乘法结果
+    
+    // 测试除法指令
+    {MOV, 6, 1},    // R6 = R1
+    {DIV, 6, 2},    // R6 = R6 / R2
+    {PRINT_INT, 6}, // 打印除法结果
+    
     {EXIT, 3},      // 退出执行，返回值位R3寄存器里的值
 };
 // 虚拟机执行 vm 函数 ，insts 为指令序列数组(传入数组名)，为 instMax数组大小
@@ -46,6 +64,18 @@ int vm(Instruction *insts, int instMax)
         case ADD: // 寄存器加法
             printf("ADD \tR%d += R%d \n", insts[pc].dest, insts[pc].src);
             regisers[insts[pc].dest] = regisers[insts[pc].dest] + regisers[insts[pc].src];
+            break;
+        case SUB: // 寄存器减法
+            printf("SUB \tR%d -= R%d \n", insts[pc].dest, insts[pc].src);
+            regisers[insts[pc].dest] = regisers[insts[pc].dest] - regisers[insts[pc].src];
+            break;
+        case MUL: // 寄存器乘法
+            printf("MUL \tR%d *= R%d \n", insts[pc].dest, insts[pc].src);
+            regisers[insts[pc].dest] = regisers[insts[pc].dest] * regisers[insts[pc].src];
+            break;
+        case DIV: // 寄存器除法
+            printf("DIV \tR%d /= R%d \n", insts[pc].dest, insts[pc].src);
+            regisers[insts[pc].dest] = regisers[insts[pc].dest] / regisers[insts[pc].src];
             break;
         case PRINT_INT: // 打印寄存器的值
             printf("PRINT_INT \tR%d ==> %d \n", insts[pc].dest, regisers[insts[pc].dest]);

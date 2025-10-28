@@ -1,7 +1,8 @@
 #include <stdio.h>
-int regisers[256]; // 寄存器数组，一共256个寄存器
-int stack[1024];   // 栈，用于函数调用保存返回地址
-int sp = 0;        // 栈指针
+int regisers[256];     // 整数寄存器数组，一共256个寄存器
+float fregisers[256];  // 浮点数寄存器数组，一共256个寄存器
+int stack[1024];       // 栈，用于函数调用保存返回地址
+int sp = 0;            // 栈指针
 // 虚拟机指令 OpCode
 typedef enum
 {
@@ -18,16 +19,39 @@ typedef enum
     EXIT,         // 退出执行
     LABEL,        // 标签定义
     PUSH,         // 将寄存器值压入栈
-    POP           // 从栈弹出值到寄存器
+    POP,          // 从栈弹出值到寄存器
+    // 浮点数指令
+    FMOV,         // 浮点数寄存器之间赋值
+    FADD,         // 浮点数寄存器加法
+    FSUB,         // 浮点数寄存器减法
+    FMUL,         // 浮点数寄存器乘法
+    FDIV,         // 浮点数寄存器除法
+    FLOAD,        // 浮点数寄存器赋值
+    PRINT_FLOAT,  // 打印浮点数寄存器的值
+    ASSERT_FLOAT, // 断言浮点数寄存器值是否符合预期
+    FPUSH,        // 将浮点数寄存器值压入栈
+    FPOP          // 从栈弹出值到浮点数寄存器
 } OpCode;
+// 指令结构内部直接使用匿名联合体支持int和float类型
+
 // 指令结构 Instruction
 typedef struct
 {
     OpCode op;   // 指令
     int dest;    // 目标寄存器
-    int src;     // 源寄存器 或 赋值数，根据指令不同判断
+    union { 
+        int src;  
+        float src_float; 
+    };
     char* label; // 标签名称（用于LABEL和CALL指令）
 } Instruction;
+// 创建带浮点数的指令辅助函数
+Instruction createFloatInst(OpCode op, int dest, float value) {
+    Instruction inst = {op, dest};
+    inst.src_float = value;
+    return inst;
+}
+
 // 自定义程序 - 指令序列
 #define INST_MAX 1024 // 指令序列数组大小
 Instruction instructions[INST_MAX] = {
@@ -127,7 +151,53 @@ Instruction instructions[INST_MAX] = {
     {ASSERT_INT, 1, 100}, // 断言R1恢复为100
     {ASSERT_INT, 2, 99},  // 断言R2恢复为99
     
-    {EXIT, 3},      // 退出执行，返回值位R3寄存器里的值
+    // ===== 浮点数测试部分 =====
+    // 测试浮点数基本指令
+    createFloatInst(FLOAD, 1, 100.0f),  // FR1 = 100.0
+    createFloatInst(FLOAD, 2, 99.0f),   // FR2 = 99.0
+    {FMOV, 3, {.src = 1}},     // FR3 = FR1
+      {FADD, 3, {.src = 2}},     // FR3 = FR3 + FR2
+      {PRINT_FLOAT, 3, {.src = 0}}, // 打印浮点数加法结果
+    createFloatInst(ASSERT_FLOAT, 3, 199.0f), // 断言FR3的值为199.0
+    
+    // 测试浮点数减法
+      {FMOV, 4, {.src = 1}},     // FR4 = FR1
+    {FSUB, 4, {.src = 2}},     // FR4 = FR4 - FR2
+      {PRINT_FLOAT, 4, {.src = 0}}, // 打印浮点数减法结果
+    createFloatInst(ASSERT_FLOAT, 4, 1.0f),   // 断言FR4的值为1.0
+    
+    // 测试浮点数乘法
+      {FMOV, 5, {.src = 1}},     // FR5 = FR1
+    {FMUL, 5, {.src = 2}},     // FR5 = FR5 * FR2
+      {PRINT_FLOAT, 5, {.src = 0}}, // 打印浮点数乘法结果
+    createFloatInst(ASSERT_FLOAT, 5, 9900.0f), // 断言FR5的值为9900.0
+    
+    // 测试浮点数除法
+    createFloatInst(FLOAD, 6, 10.0f),   // FR6 = 10.0
+    createFloatInst(FLOAD, 7, 2.0f),    // FR7 = 2.0
+    {FDIV, 6, {.src = 7}},     // FR6 = FR6 / FR7
+      {PRINT_FLOAT, 6, {.src = 0}}, // 打印浮点数除法结果
+    createFloatInst(ASSERT_FLOAT, 6, 5.0f),  // 断言FR6的值为5.0
+    
+    // 测试浮点数函数调用
+    // 测试浮点数加法函数
+    {FPUSH, 1, {.src = 0}},       // 保存FR1原始值到栈
+      {FPUSH, 2, {.src = 0}},       // 保存FR2原始值到栈
+    createFloatInst(FLOAD, 1, 5.0f),    // 设置函数参数 FR1 = 5.0
+    createFloatInst(FLOAD, 2, 3.0f),    // 设置函数参数 FR2 = 3.0
+    {CALL, 0, {.src = 0}, "fadd"}, // 调用浮点数加法函数
+      {PRINT_FLOAT, 0, {.src = 0}}, // 打印浮点数函数返回值
+    createFloatInst(ASSERT_FLOAT, 0, 8.0f),   // 断言函数返回值为8.0
+    
+    // 恢复浮点数寄存器值
+    {FPOP, 2, {.src = 0}},        // 恢复FR2原始值
+      {FPOP, 1, {.src = 0}},        // 恢复FR1原始值
+    
+    // 验证浮点数寄存器是否被正确恢复
+    createFloatInst(ASSERT_FLOAT, 1, 100.0f), // 断言FR1恢复为100.0
+    createFloatInst(ASSERT_FLOAT, 2, 99.0f)  // 断言FR2恢复为99.0
+    
+    {EXIT, 3, {.src = 0}}      // 退出执行，返回值位R3寄存器里的值
     
     // 函数定义：计算两个数的和
     // 输入：R1, R2
@@ -160,6 +230,14 @@ Instruction instructions[INST_MAX] = {
     {MOV, 0, 1},    // R0 = R1
     {DIV, 0, 2},    // R0 = R0 / R2
     {RET, 0, 0},    // 返回
+    
+    // 浮点数函数定义：计算两个浮点数的和
+    // 输入：FR1, FR2
+    // 输出：FR0
+    {LABEL, 0, 0, "fadd"},  // 添加浮点数加法函数标签
+    {FMOV, 0, 1},    // FR0 = FR1
+    {FADD, 0, 2},    // FR0 = FR0 + FR2
+    {RET, 0, 0},     // 返回
 };
 // 虚拟机执行 vm 函数 ，insts 为指令序列数组(传入数组名)，为 instMax数组大小
 int vm(Instruction *insts, int instMax)
@@ -266,6 +344,76 @@ int vm(Instruction *insts, int instMax)
         case LABEL: // 标签指令
             // 标签已经在扫描阶段处理过了，执行时直接跳过
             printf("SKIP LABEL: %s\n", insts[pc].label ? insts[pc].label : "unnamed");
+            break;
+        // 浮点数指令实现
+        case FLOAD: // 浮点数寄存器赋值
+            printf("FLOAD \tFR%d = %f \n", insts[pc].dest, insts[pc].src_float);
+            fregisers[insts[pc].dest] = insts[pc].src_float;
+            break;
+        case FMOV: // 浮点数寄存器之间赋值
+            printf("FMOV \tFR%d = FR%d \n", insts[pc].dest, insts[pc].src);
+            fregisers[insts[pc].dest] = fregisers[insts[pc].src];
+            break;
+        case FADD: // 浮点数寄存器加法
+            printf("FADD \tFR%d += FR%d \n", insts[pc].dest, insts[pc].src);
+            fregisers[insts[pc].dest] = fregisers[insts[pc].dest] + fregisers[insts[pc].src];
+            break;
+        case FSUB: // 浮点数寄存器减法
+            printf("FSUB \tFR%d -= FR%d \n", insts[pc].dest, insts[pc].src);
+            fregisers[insts[pc].dest] = fregisers[insts[pc].dest] - fregisers[insts[pc].src];
+            break;
+        case FMUL: // 浮点数寄存器乘法
+            printf("FMUL \tFR%d *= FR%d \n", insts[pc].dest, insts[pc].src);
+            fregisers[insts[pc].dest] = fregisers[insts[pc].dest] * fregisers[insts[pc].src];
+            break;
+        case FDIV: // 浮点数寄存器除法
+            printf("FDIV \tFR%d /= FR%d \n", insts[pc].dest, insts[pc].src);
+            if (fregisers[insts[pc].src] != 0.0f) {
+                fregisers[insts[pc].dest] = fregisers[insts[pc].dest] / fregisers[insts[pc].src];
+            } else {
+                printf("Error: Floating point division by zero\n");
+                return -1;
+            }
+            break;
+        case PRINT_FLOAT: // 打印浮点数寄存器的值
+            printf("PRINT_FLOAT \tFR%d ==> %f \n", insts[pc].dest, fregisers[insts[pc].dest]);
+            break;
+        case ASSERT_FLOAT: // 断言浮点数寄存器值是否符合预期
+            printf("ASSERT_FLOAT \tFR%d == %f ", insts[pc].dest, insts[pc].src_float);
+            // 浮点数比较使用一个小的误差范围
+            if (fregisers[insts[pc].dest] >= insts[pc].src_float - 0.0001f && 
+                fregisers[insts[pc].dest] <= insts[pc].src_float + 0.0001f) {
+                printf("FR%d = %f OK\n", insts[pc].dest, fregisers[insts[pc].dest]);
+            } else {
+                printf("ERROR: FR%d = %f != %f\n", insts[pc].dest, fregisers[insts[pc].dest], insts[pc].src_float);
+                printf("Assertion failed at instruction %d\n", pc);
+                return -1;
+            }
+            break;
+        case FPUSH: // 将浮点数寄存器值压入栈（使用类型转换）
+            printf("FPUSH \tFR%d = %f\n", insts[pc].dest, fregisers[insts[pc].dest]);
+            if (sp < 1024 - sizeof(float) / sizeof(int)) {
+                // 使用联合体或类型转换将float存储到int栈中
+                union { float f; int i[2]; } converter;
+                converter.f = fregisers[insts[pc].dest];
+                stack[sp++] = converter.i[0];
+                stack[sp++] = converter.i[1];
+            } else {
+                printf("Error: Stack overflow\n");
+                return -1;
+            }
+            break;
+        case FPOP: // 从栈弹出值到浮点数寄存器（使用类型转换）
+            if (sp >= 2) {
+                union { float f; int i[2]; } converter;
+                converter.i[1] = stack[--sp];
+                converter.i[0] = stack[--sp];
+                fregisers[insts[pc].dest] = converter.f;
+                printf("FPOP \tFR%d = %f\n", insts[pc].dest, fregisers[insts[pc].dest]);
+            } else {
+                printf("Error: Stack underflow\n");
+                return -1;
+            }
             break;
         default: // 不支持的指令，打印错误信息，并退出
             printf("Error Op=%d\n", insts[pc].op);

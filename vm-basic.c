@@ -45,7 +45,7 @@ typedef struct
     };
     char* label; // 标签名称（用于LABEL和CALL指令）
 } Instruction;
-// 创建带浮点数的指令辅助函数
+// 创建带浮点数的指令辅助函数（仅用于运行时，不能用于全局变量初始化）
 Instruction createFloatInst(OpCode op, int dest, float value) {
     Instruction inst = {op, dest};
     inst.src_float = value;
@@ -153,91 +153,92 @@ Instruction instructions[INST_MAX] = {
     
     // ===== 浮点数测试部分 =====
     // 测试浮点数基本指令
-    createFloatInst(FLOAD, 1, 100.0f),  // FR1 = 100.0
-    createFloatInst(FLOAD, 2, 99.0f),   // FR2 = 99.0
+    {FLOAD, 1, {.src_float = 100.0f}},  // FR1 = 100.0
+    {FLOAD, 2, {.src_float = 99.0f}},   // FR2 = 99.0
     {FMOV, 3, {.src = 1}},     // FR3 = FR1
       {FADD, 3, {.src = 2}},     // FR3 = FR3 + FR2
       {PRINT_FLOAT, 3, {.src = 0}}, // 打印浮点数加法结果
-    createFloatInst(ASSERT_FLOAT, 3, 199.0f), // 断言FR3的值为199.0
+    {ASSERT_FLOAT, 3, {.src_float = 199.0f}}, // 断言FR3的值为199.0
     
     // 测试浮点数减法
       {FMOV, 4, {.src = 1}},     // FR4 = FR1
     {FSUB, 4, {.src = 2}},     // FR4 = FR4 - FR2
       {PRINT_FLOAT, 4, {.src = 0}}, // 打印浮点数减法结果
-    createFloatInst(ASSERT_FLOAT, 4, 1.0f),   // 断言FR4的值为1.0
+    {ASSERT_FLOAT, 4, {.src_float = 1.0f}},   // 断言FR4的值为1.0
     
     // 测试浮点数乘法
       {FMOV, 5, {.src = 1}},     // FR5 = FR1
     {FMUL, 5, {.src = 2}},     // FR5 = FR5 * FR2
       {PRINT_FLOAT, 5, {.src = 0}}, // 打印浮点数乘法结果
-    createFloatInst(ASSERT_FLOAT, 5, 9900.0f), // 断言FR5的值为9900.0
+    {ASSERT_FLOAT, 5, {.src_float = 9900.0f}}, // 断言FR5的值为9900.0
     
     // 测试浮点数除法
-    createFloatInst(FLOAD, 6, 10.0f),   // FR6 = 10.0
-    createFloatInst(FLOAD, 7, 2.0f),    // FR7 = 2.0
+    {FLOAD, 6, {.src_float = 10.0f}},   // FR6 = 10.0
+    {FLOAD, 7, {.src_float = 2.0f}},    // FR7 = 2.0
     {FDIV, 6, {.src = 7}},     // FR6 = FR6 / FR7
       {PRINT_FLOAT, 6, {.src = 0}}, // 打印浮点数除法结果
-    createFloatInst(ASSERT_FLOAT, 6, 5.0f),  // 断言FR6的值为5.0
+    {ASSERT_FLOAT, 6, {.src_float = 5.0f}},  // 断言FR6的值为5.0
     
     // 测试浮点数函数调用
     // 测试浮点数加法函数
     {FPUSH, 1, {.src = 0}},       // 保存FR1原始值到栈
       {FPUSH, 2, {.src = 0}},       // 保存FR2原始值到栈
-    createFloatInst(FLOAD, 1, 5.0f),    // 设置函数参数 FR1 = 5.0
-    createFloatInst(FLOAD, 2, 3.0f),    // 设置函数参数 FR2 = 3.0
+    {FLOAD, 1, {.src_float = 5.0f}},    // 设置函数参数 FR1 = 5.0
+    {FLOAD, 2, {.src_float = 3.0f}},    // 设置函数参数 FR2 = 3.0
     {CALL, 0, {.src = 0}, "fadd"}, // 调用浮点数加法函数
       {PRINT_FLOAT, 0, {.src = 0}}, // 打印浮点数函数返回值
-    createFloatInst(ASSERT_FLOAT, 0, 8.0f),   // 断言函数返回值为8.0
+    {ASSERT_FLOAT, 0, {.src_float = 8.0f}},   // 断言函数返回值为8.0
     
     // 恢复浮点数寄存器值
     {FPOP, 2, {.src = 0}},        // 恢复FR2原始值
       {FPOP, 1, {.src = 0}},        // 恢复FR1原始值
     
     // 验证浮点数寄存器是否被正确恢复
-    createFloatInst(ASSERT_FLOAT, 1, 100.0f), // 断言FR1恢复为100.0
-    createFloatInst(ASSERT_FLOAT, 2, 99.0f)  // 断言FR2恢复为99.0
+    {ASSERT_FLOAT, 1, {.src_float = 100.0f}}, // 断言FR1恢复为100.0
+    {ASSERT_FLOAT, 2, {.src_float = 99.0f}}, // 断言FR2恢复为99.0
+    {EXIT, 3, {.src = 0}},     // 退出执行，返回值位R3寄存器里的值
     
-    {EXIT, 3, {.src = 0}}      // 退出执行，返回值位R3寄存器里的值
-    
+    // 以下是函数标签定义
     // 函数定义：计算两个数的和
     // 输入：R1, R2
     // 输出：R0
-    {LABEL, 0, 0, "add"},  // 添加加法函数标签
+    // 调用方法：LOAD R1, LOAD R2, CALL add, R0即为结果
+    {LABEL, 0, 0, "add"},  // 定义add标签
     {MOV, 0, 1},    // R0 = R1
-    {ADD, 0, 2},    // R0 = R0 + R2
-    {RET, 0, 0},    // 返回
+    {ADD, 0, 2},    // R0 += R2
+    {RET, 0, 0},               // 返回
     
     // 函数定义：计算两个数的差
     // 输入：R1, R2
     // 输出：R0
-    {LABEL, 0, 0, "sub"},  // 添加减法函数标签
+    {LABEL, 0, 0, "sub"},  // 定义sub标签
     {MOV, 0, 1},    // R0 = R1
-    {SUB, 0, 2},    // R0 = R0 - R2
+    {SUB, 0, 2},    // R0 -= R2
     {RET, 0, 0},    // 返回
     
     // 函数定义：计算两个数的积
     // 输入：R1, R2
     // 输出：R0
-    {LABEL, 0, 0, "mul"},  // 添加乘法函数标签
+    {LABEL, 0, 0, "mul"},  // 定义mul标签
     {MOV, 0, 1},    // R0 = R1
-    {MUL, 0, 2},    // R0 = R0 * R2
+    {MUL, 0, 2},    // R0 *= R2
     {RET, 0, 0},    // 返回
     
     // 函数定义：计算两个数的商
     // 输入：R1, R2
     // 输出：R0
-    {LABEL, 0, 0, "div"},  // 添加除法函数标签
+    {LABEL, 0, 0, "div"},  // 定义div标签
     {MOV, 0, 1},    // R0 = R1
-    {DIV, 0, 2},    // R0 = R0 / R2
+    {DIV, 0, 2},    // R0 /= R2
     {RET, 0, 0},    // 返回
     
     // 浮点数函数定义：计算两个浮点数的和
     // 输入：FR1, FR2
     // 输出：FR0
-    {LABEL, 0, 0, "fadd"},  // 添加浮点数加法函数标签
+    {LABEL, 0, 0, "fadd"},  // 定义fadd标签
     {FMOV, 0, 1},    // FR0 = FR1
-    {FADD, 0, 2},    // FR0 = FR0 + FR2
-    {RET, 0, 0},     // 返回
+    {FADD, 0, 2},    // FR0 += FR2
+    {RET, 0, 0}     // 返回
 };
 // 虚拟机执行 vm 函数 ，insts 为指令序列数组(传入数组名)，为 instMax数组大小
 int vm(Instruction *insts, int instMax)
@@ -420,13 +421,309 @@ int vm(Instruction *insts, int instMax)
             return -1;
         }
     }
+
     printf("vm end exit\n");
     return 0;
 }
+
+void AsmOutput(Instruction insts[], int count, char *filename) {
+    FILE *fp = fopen(filename, "w");
+    if (!fp) {
+        perror("Failed to open output file");
+        return;
+    }
+
+    // Windows兼容的汇编头部
+    fprintf(fp, "extern _printf\n");
+    fprintf(fp, "extern _exit\n");
+    fprintf(fp, "global _main\n\n");
+    
+    // .data段定义 - 使用更简单的数据结构
+    fprintf(fp, ".data\n");
+    fprintf(fp, "fmt_int:    db 'R%%d = %%d\\r\\n', 0\n");
+    fprintf(fp, "fmt_float:  db 'FR%%d = %%f\\r\\n', 0\n");
+    fprintf(fp, "fmt_assert: db 'ASSERTION FAILED\\r\\n', 0\n");
+    
+    // 为每个寄存器创建独立的变量，避免复杂的偏移寻址
+    for (int i = 0; i < 16; i++) {
+        fprintf(fp, "reg%d:      dd 0                   ; R%d\n", i, i);
+    }
+    for (int i = 0; i < 16; i++) {
+        fprintf(fp, "freg%d:     dq 0                   ; FR%d\n", i, i);
+    }
+    
+    // 为栈操作创建临时变量
+    fprintf(fp, "stack:      times 1024 dd 0       ; 栈空间\n");
+    fprintf(fp, "sp:         dd 0                  ; 栈指针\n");
+    fprintf(fp, "temp_addr:  dd 0                  ; 临时地址变量\n\n");
+    
+    // .text段定义
+    fprintf(fp, ".text\n");
+    fprintf(fp, "_main:                           ; Windows入口点\n");
+    
+    int pc = 0;
+    while (pc < count && insts[pc].op != EXIT) {
+        switch (insts[pc].op) {
+            case LOAD:
+                // 最简单的加载方式
+                fprintf(fp, "    mov dword [reg%d], %d           ; R%d = %d\n", 
+                        insts[pc].dest, insts[pc].src, insts[pc].dest, insts[pc].src);
+                break;
+            case FLOAD:
+                // 简化浮点数加载，避免复杂寻址
+                fprintf(fp, "    ; 处理浮点数加载: FR%d = %f\n", insts[pc].dest, insts[pc].src_float);
+                fprintf(fp, "    push dword %d                  ; 推送浮点数的整数表示部分\n", (int)(insts[pc].src_float * 1000));
+                fprintf(fp, "    push dword 1000                ; 推送除数\n");
+                fprintf(fp, "    fild dword [esp]               ; 加载除数\n");
+                fprintf(fp, "    fild dword [esp+4]             ; 加载分子\n");
+                fprintf(fp, "    fdivp st1, st0                 ; 执行除法得到浮点数\n");
+                fprintf(fp, "    fstp qword [freg%d]            ; 存储到FR%d\n", insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    add esp, 8                     ; 清理栈\n");
+                break;
+            case MOV:
+                // 简单的寄存器赋值
+                fprintf(fp, "    mov eax, [reg%d]                ; 加载R%d\n", 
+                        insts[pc].src, insts[pc].src);
+                fprintf(fp, "    mov [reg%d], eax                ; R%d = R%d\n", 
+                        insts[pc].dest, insts[pc].dest, insts[pc].src);
+                break;
+            case FMOV:
+                // 浮点数寄存器操作
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", insts[pc].src, insts[pc].src);
+                fprintf(fp, "    fstp qword [freg%d]            ; 存储到FR%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                break;
+            case ADD:
+                // 加法操作
+                fprintf(fp, "    mov eax, [reg%d]                ; 加载R%d\n", 
+                        insts[pc].src, insts[pc].src);
+                fprintf(fp, "    add [reg%d], eax                ; R%d += R%d\n", 
+                        insts[pc].dest, insts[pc].dest, insts[pc].src);
+                break;
+            case FADD:
+                // 浮点数加法
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", 
+                        insts[pc].src, insts[pc].src);
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    faddp st1, st0                 ; FR%d += FR%d\n", 
+                        insts[pc].dest, insts[pc].src);
+                fprintf(fp, "    fstp qword [freg%d]            ; 存储结果到FR%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                break;
+            case SUB:
+                // 减法操作
+                fprintf(fp, "    mov eax, [reg%d]                ; 加载R%d\n", 
+                        insts[pc].src, insts[pc].src);
+                fprintf(fp, "    sub [reg%d], eax                ; R%d -= R%d\n", 
+                        insts[pc].dest, insts[pc].dest, insts[pc].src);
+                break;
+            case FSUB:
+                // 浮点数减法
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", 
+                        insts[pc].src, insts[pc].src);
+                fprintf(fp, "    fsubp st1, st0                 ; FR%d -= FR%d\n", 
+                        insts[pc].dest, insts[pc].src);
+                fprintf(fp, "    fstp qword [freg%d]            ; 存储结果到FR%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                break;
+            case MUL:
+                // 乘法操作
+                fprintf(fp, "    mov eax, [reg%d]                ; 加载R%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    mov ebx, [reg%d]                ; 加载R%d\n", 
+                        insts[pc].src, insts[pc].src);
+                fprintf(fp, "    imul eax, ebx                  ; eax = R%d * R%d\n", 
+                        insts[pc].dest, insts[pc].src);
+                fprintf(fp, "    mov [reg%d], eax                ; R%d = 结果\n", 
+                        insts[pc].dest, insts[pc].dest);
+                break;
+            case FMUL:
+                // 浮点数乘法
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", 
+                        insts[pc].src, insts[pc].src);
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    fmulp st1, st0                 ; FR%d *= FR%d\n", 
+                        insts[pc].dest, insts[pc].src);
+                fprintf(fp, "    fstp qword [freg%d]            ; 存储结果到FR%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                break;
+            case DIV:
+                // 除法操作
+                fprintf(fp, "    mov eax, [reg%d]                ; 加载R%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    mov ebx, [reg%d]                ; 加载R%d\n", 
+                        insts[pc].src, insts[pc].src);
+                fprintf(fp, "    cdq                            ; 符号扩展eax到edx\n");
+                fprintf(fp, "    idiv ebx                       ; eax = R%d / R%d\n", 
+                        insts[pc].dest, insts[pc].src);
+                fprintf(fp, "    mov [reg%d], eax                ; R%d = 结果\n", 
+                        insts[pc].dest, insts[pc].dest);
+                break;
+            case FDIV:
+                // 浮点数除法
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", 
+                        insts[pc].src, insts[pc].src);
+                fprintf(fp, "    fdivp st1, st0                 ; FR%d /= FR%d\n", 
+                        insts[pc].dest, insts[pc].src);
+                fprintf(fp, "    fstp qword [freg%d]            ; 存储结果到FR%d\n", 
+                        insts[pc].dest, insts[pc].dest);
+                break;
+            case PRINT_INT:
+                // 打印整数 - 简化的参数传递
+                fprintf(fp, "    push dword [reg%d]              ; 压入R%d的值\n", 
+                        insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    push dword %d                   ; 压入寄存器编号\n", insts[pc].dest);
+                fprintf(fp, "    push dword fmt_int              ; 压入格式字符串\n");
+                fprintf(fp, "    call _printf                    ; 调用printf\n");
+                fprintf(fp, "    add esp, 12                    ; 清理栈\n");
+                break;
+            case PRINT_FLOAT:
+                // 打印浮点数 - 简化的参数传递
+                fprintf(fp, "    sub esp, 8                     ; 为浮点数参数预留空间\n");
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    fstp qword [esp]               ; 存储到栈参数\n");
+                fprintf(fp, "    push dword %d                   ; 压入寄存器编号\n", insts[pc].dest);
+                fprintf(fp, "    push dword fmt_float            ; 压入格式字符串\n");
+                fprintf(fp, "    call _printf                    ; 调用printf\n");
+                fprintf(fp, "    add esp, 16                    ; 清理栈\n");
+                break;
+            case ASSERT_INT:
+                // 整数断言
+                fprintf(fp, "    mov eax, [reg%d]                ; 加载R%d\n", insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    cmp eax, %d                     ; 比较R%d和预期值\n", insts[pc].src, insts[pc].dest);
+                fprintf(fp, "    je assert_int_ok_%d            ; 如果相等，继续执行\n", pc);
+                fprintf(fp, "    push dword fmt_assert           ; 打印错误信息\n");
+                fprintf(fp, "    call _printf                    ; 调用printf\n");
+                fprintf(fp, "    add esp, 4                      ; 清理栈\n");
+                fprintf(fp, "    push dword -1                   ; 设置错误退出码\n");
+                fprintf(fp, "    call _exit                      ; 调用exit\n");
+                fprintf(fp, "assert_int_ok_%d:\n", pc);
+                break;
+            case ASSERT_FLOAT:
+                // 简化浮点数断言，使用整数比较方式
+                fprintf(fp, "    ; 处理浮点数断言: FR%d == %f\n", insts[pc].dest, insts[pc].src_float);
+                fprintf(fp, "    ; 转换为整数进行比较（乘以1000取整）\n");
+                fprintf(fp, "    push dword %d                ; 推送期望值的整数表示部分\n", (int)(insts[pc].src_float * 1000));
+                fprintf(fp, "    push dword 0                   ; 为实际值预留空间\n");
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    fmul dword [esp]              ; 乘以1000\n");
+                fprintf(fp, "    fistp dword [esp+4]           ; 转换为整数\n");
+                fprintf(fp, "    mov eax, [esp]                ; 加载期望值\n");
+                fprintf(fp, "    mov ebx, [esp+4]              ; 加载实际值\n");
+                fprintf(fp, "    cmp eax, ebx                  ; 比较两个整数\n");
+                fprintf(fp, "    je assert_float_ok_%d         ; 如果相等，跳转到成功\n", pc);
+                fprintf(fp, "assert_float_error_%d:\n", pc);
+                fprintf(fp, "    push dword fmt_assert          ; 打印错误信息\n");
+                fprintf(fp, "    call _printf                   ; 调用printf\n");
+                fprintf(fp, "    add esp, 8                     ; 清理栈\n");
+                fprintf(fp, "    push dword -1                  ; 设置错误退出码\n");
+                fprintf(fp, "    call _exit                     ; 调用exit\n");
+                fprintf(fp, "assert_float_ok_%d:\n", pc);
+                fprintf(fp, "    add esp, 8                     ; 清理栈\n");
+                break;
+            case PUSH:
+                // 使用临时变量计算地址，避免复杂的寻址表达式
+                fprintf(fp, "    mov eax, [sp]                  ; 获取栈指针\n");
+                fprintf(fp, "    mov edx, 4                     ; 每个栈元素4字节\n");
+                fprintf(fp, "    mul edx                        ; 计算偏移量\n");
+                fprintf(fp, "    mov [temp_addr], eax           ; 保存计算的地址\n");
+                fprintf(fp, "    mov ebx, [reg%d]                ; 加载R%d\n", insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    mov eax, [temp_addr]           ; 获取计算的地址\n");
+                fprintf(fp, "    mov dword [stack + eax], ebx   ; 存储到栈中\n");
+                fprintf(fp, "    inc dword [sp]                 ; 栈指针加1\n");
+                break;
+            case POP:
+                // 使用临时变量计算地址
+                fprintf(fp, "    dec dword [sp]                 ; 栈指针减1\n");
+                fprintf(fp, "    mov eax, [sp]                  ; 获取栈指针\n");
+                fprintf(fp, "    mov edx, 4                     ; 每个栈元素4字节\n");
+                fprintf(fp, "    mul edx                        ; 计算偏移量\n");
+                fprintf(fp, "    mov [temp_addr], eax           ; 保存计算的地址\n");
+                fprintf(fp, "    mov eax, [temp_addr]           ; 获取计算的地址\n");
+                fprintf(fp, "    mov ebx, dword [stack + eax]   ; 从栈中加载值\n");
+                fprintf(fp, "    mov [reg%d], ebx                ; 存储到R%d\n", insts[pc].dest, insts[pc].dest);
+                break;
+            case FPUSH:
+                // 浮点数PUSH，使用临时变量计算地址
+                fprintf(fp, "    mov eax, [sp]                  ; 获取栈指针\n");
+                fprintf(fp, "    mov edx, 4                     ; 每个栈元素4字节\n");
+                fprintf(fp, "    mul edx                        ; 计算偏移量\n");
+                fprintf(fp, "    mov [temp_addr], eax           ; 保存计算的地址\n");
+                fprintf(fp, "    mov eax, [temp_addr]           ; 获取计算的地址\n");
+                fprintf(fp, "    fld qword [freg%d]             ; 加载FR%d\n", insts[pc].dest, insts[pc].dest);
+                fprintf(fp, "    fstp qword [stack + eax]       ; 存储到栈中\n");
+                fprintf(fp, "    add dword [sp], 2              ; 浮点数占用两个栈位置\n");
+                break;
+            case FPOP:
+                // 浮点数POP，使用临时变量计算地址
+                fprintf(fp, "    sub dword [sp], 2              ; 浮点数占用两个栈位置\n");
+                fprintf(fp, "    mov eax, [sp]                  ; 获取栈指针\n");
+                fprintf(fp, "    mov edx, 4                     ; 每个栈元素4字节\n");
+                fprintf(fp, "    mul edx                        ; 计算偏移量\n");
+                fprintf(fp, "    mov [temp_addr], eax           ; 保存计算的地址\n");
+                fprintf(fp, "    mov eax, [temp_addr]           ; 获取计算的地址\n");
+                fprintf(fp, "    fld qword [stack + eax]        ; 从栈中加载浮点数\n");
+                fprintf(fp, "    fstp qword [freg%d]            ; 存储到FR%d\n", insts[pc].dest, insts[pc].dest);
+                break;
+            case CALL:
+                if (insts[pc].label) {
+                    fprintf(fp, "    call %s                        ; 调用函数 %s\n", 
+                            insts[pc].label, insts[pc].label);
+                }
+                break;
+            case RET:
+                fprintf(fp, "    ret                            ; 返回\n");
+                break;
+            case LABEL:
+                if (insts[pc].label) {
+                    fprintf(fp, "%s:\n", insts[pc].label);
+                }
+                break;
+            case EXIT:
+                // 这个会被while循环处理，不需要额外输出
+                break;
+            default:
+                fprintf(fp, "    ; Unsupported instruction: %d\n", insts[pc].op);
+                break;
+        }
+        pc++;
+    }
+
+    // 程序结束，Windows风格的退出
+    fprintf(fp, "    push dword 0                   ; 设置正常退出码\n");
+    fprintf(fp, "    call _exit                     ; 调用exit\n");
+
+    fclose(fp);
+    printf("NASM assembly code successfully generated to %s\n", filename);
+    printf("Check file exists: %s\n", filename);
+    // 尝试重新打开文件验证
+    FILE *verify = fopen(filename, "r");
+    if (verify) {
+        printf("File verification successful: %s exists\n", filename);
+        fclose(verify);
+    } else {
+        printf("Warning: Cannot reopen file for verification\n");
+        perror("reopen error");
+    }
+}
+
 int main(void)
 {
     int ret = 0; // 虚拟机返回值
     printf("Hello VM-01 \n");
+    
+    // 生成NASM汇编代码
+    printf("Generating NASM assembly code...\n");
+    AsmOutput(instructions, INST_MAX, "out.asm");
+    printf("Assembly generation complete.\n");
+    
+    // 运行虚拟机
     ret = vm(instructions, INST_MAX);
     printf("vm return = %d\n", ret);
     return ret;

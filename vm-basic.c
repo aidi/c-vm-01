@@ -454,8 +454,52 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
     fprintf(fp,"    push rbp                ; Save caller's base pointer\n");
     fprintf(fp,"    mov rbp, rsp            ; Set current function's base pointer\n");
 
-    fprintf(fp,"    mov dword [rel reg + 4], 1  ; reg[1] = 1 (each element is 4 bytes, offset is 4)\n");
+    fprintf(fp,"    mov dword [rel reg + 4], 666  ; reg[1] = 1 (each element is 4 bytes, offset is 4)\n");
+    fprintf(fp,"    ; Call printf to output reg[0]\n");
+    fprintf(fp,"    mov rcx, format        ; First parameter: format string\n");
+    fprintf(fp,"    mov edx, dword [rel reg+4*1]  ; Second parameter: value of reg[1]\n");
+    fprintf(fp,"    call printf\n");
+    // compiler 
+    int i = 0;
+    while (i < count && insts[i].op != EXIT) {
+        switch (insts[i].op) {
+            case LOAD:
+                // 最简单的加载方式
+                fprintf(fp,"    ; LOAD: R%d = %d\n", insts[i].dest, insts[i].src);
+                fprintf(fp, "    mov dword [rel reg+%d*4], %d           ; R%d = %d\n", 
+                        insts[i].dest, insts[i].src, insts[i].dest, insts[i].src);
+                break;
+            case MOV:
+                // 最简单的加载方式
+                fprintf(fp,"    ; MOV: R%d = R%d\n", insts[i].dest, insts[i].src);
+                fprintf(fp,"    mov eax, [rel reg+%d*4]    ; 先加载到寄存器\n",insts[i].src);
+                fprintf(fp,"    mov [rel reg+%d*4], eax    ; 再从寄存器存储\n", insts[i].dest);
+                // fprintf(fp, "    mov dword [rel reg+%d*4], dword [rel reg+%d*4]           ; R%d = R%d\n", 
+                //         insts[i].dest, insts[i].src, insts[i].dest, insts[i].src);
+                break;
+            case ADD:
+                // 最简单的加载方式
+                fprintf(fp,"    ; ADD: R%d = R%d + R%d\n", insts[i].dest, insts[i].dest, insts[i].src);
+                fprintf(fp,"    mov eax, [rel reg+%d*4]    ; 先加载到寄存器\n",insts[i].dest);
+                fprintf(fp,"    add eax, [rel reg+%d*4]    ; 再从寄存器存储\n", insts[i].src);
+                fprintf(fp,"    mov [rel reg+%d*4], eax    ; 再从寄存器存储\n", insts[i].dest);
+                break;
+            case PRINT_INT:
+                // 最简单的加载方式
+                fprintf(fp,"    ; PRINT_INT:  R%d = ?\n", insts[i].dest);
+                fprintf(fp,"    mov rcx, format        ; First parameter: format string\n");
+                fprintf(fp,"    mov edx, [rel reg+%d*4]    ; second param \n",insts[i].dest);
+                fprintf(fp,"    call printf\n");
+                break;
+            default:
+                printf("Error Op=%d\n", insts[i].op);
+                return ;
+            }
+            i++;
+    }
 
+    //999 end 
+    fprintf(fp,"    mov dword [rel reg + 4], 999  ; reg[1] = 1 (each element is 4 bytes, offset is 4)\n");
     fprintf(fp,"    ; Call printf to output reg[0]\n");
     fprintf(fp,"    mov rcx, format        ; First parameter: format string\n");
     fprintf(fp,"    mov edx, dword [rel reg+4*1]  ; Second parameter: value of reg[1]\n");

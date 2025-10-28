@@ -13,6 +13,7 @@ main:
     mov rcx, format        ; First parameter: format string
     mov edx, dword [rel reg+4*1]  ; Second parameter: value of reg[1]
     call printf
+; compiler generated code --start-----------------------------------------
     ; LOAD: R1 = 100
     mov dword [rel reg+1*4], 100           ; R1 = 100
     ; LOAD: R2 = 99
@@ -28,6 +29,7 @@ main:
     mov rcx, format        ; First parameter: format string
     mov edx, [rel reg+3*4]    ; second param 
     call printf
+; compiler generated code --end---------------------------------------
     mov dword [rel reg + 4], 999  ; reg[1] = 1 (each element is 4 bytes, offset is 4)
     ; Call printf to output reg[0]
     mov rcx, format        ; First parameter: format string

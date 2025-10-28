@@ -460,6 +460,7 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
     fprintf(fp,"    mov edx, dword [rel reg+4*1]  ; Second parameter: value of reg[1]\n");
     fprintf(fp,"    call printf\n");
     // compiler 
+    fprintf(fp,"; compiler generated code --start-----------------------------------------\n");
     int i = 0;
     while (i < count && insts[i].op != EXIT) {
         switch (insts[i].op) {
@@ -497,6 +498,9 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
             }
             i++;
     }
+    fprintf(fp,"; compiler generated code --end---------------------------------------\n");
+    
+    //999 end 
 
     //999 end 
     fprintf(fp,"    mov dword [rel reg + 4], 999  ; reg[1] = 1 (each element is 4 bytes, offset is 4)\n");

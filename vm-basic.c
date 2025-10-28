@@ -52,20 +52,29 @@ Instruction instructions[INST_MAX] = {
     {PRINT_INT, 6}, // 打印除法结果
     {ASSERT_INT, 6, 1},   // 断言R6的值为1
     
-    // 测试函数调用
-    {LOAD, 7, 5},   // 设置函数参数 R7 = 5
-    {LOAD, 8, 3},   // 设置函数参数 R8 = 3
-    {CALL, 0, 24},  // 调用函数，函数起始位置在索引24
-    {PRINT_INT, 9}, // 打印函数返回值
-    {ASSERT_INT, 9, 15},  // 断言函数返回值为15
+    // 测试函数调用 - 使用标准参数传递约定
+    // 先保存R1和R2的原始值到临时寄存器
+    {MOV, 7, 1},    // 保存R1原始值到R7
+    {MOV, 8, 2},    // 保存R2原始值到R8
+    {LOAD, 1, 5},   // 设置函数参数 R1 = 5
+    {LOAD, 2, 3},   // 设置函数参数 R2 = 3
+    {CALL, 0, 30},  // 调用函数，函数起始位置在索引30
+    {PRINT_INT, 0}, // 打印函数返回值（保存在R0）
+    {ASSERT_INT, 0, 15},  // 断言函数返回值为15
+    
+    // 验证寄存器是否被正确恢复
+    {PRINT_INT, 1}, // 打印R1
+    {PRINT_INT, 2}, // 打印R2
+    {ASSERT_INT, 1, 100}, // 断言R1恢复为100
+    {ASSERT_INT, 2, 99},  // 断言R2恢复为99
     
     {EXIT, 3},      // 退出执行，返回值位R3寄存器里的值
     
     // 函数定义：计算两个数的乘积
-    // 输入：R7, R8
-    // 输出：R9
-    {MOV, 9, 7},    // R9 = R7
-    {MUL, 9, 8},    // R9 = R9 * R8
+    // 输入：R1, R2
+    // 输出：R0
+    {MOV, 0, 1},    // R0 = R1
+    {MUL, 0, 2},    // R0 = R0 * R2
     {RET, 0, 0},    // 返回
 };
 // 虚拟机执行 vm 函数 ，insts 为指令序列数组(传入数组名)，为 instMax数组大小
@@ -114,14 +123,20 @@ int vm(Instruction *insts, int instMax)
             printf("CALL \tjump to %d \n", insts[pc].src);
             // 保存返回地址到栈
             stack[sp++] = pc + 1;
+            // 保存R1和R2的原始值到栈（从R7和R8恢复）
+            stack[sp++] = regisers[8]; // 保存R2原始值
+            stack[sp++] = regisers[7]; // 保存R1原始值
             // 跳转到函数地址
-            pc = insts[pc].src - 1; // 减1是因为循环结束后会pc++
+            pc = insts[pc].src - 1;
             break;
         case RET: // 函数返回
             printf("RET \treturn from function\n");
-            if (sp > 0) {
+            if (sp >= 3) {
+                // 恢复R1和R2的值
+                regisers[1] = stack[--sp];
+                regisers[2] = stack[--sp];
                 // 从栈中弹出返回地址并跳转
-                pc = stack[--sp] - 1; // 减1是因为循环结束后会pc++
+                pc = stack[--sp] - 1;
             } else {
                 printf("Error: Stack underflow\n");
                 return -1;

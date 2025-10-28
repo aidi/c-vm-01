@@ -1,5 +1,6 @@
 section  .data
     int_format db "%d", 10, 0  ; Format string for printf
+    float_format db "%f", 10, 0  ; Format string for printf
     freg times 256 dd 0.0 
 section .bss
     reg resd 8 ; Reserve space for 8 double words (4 bytes each)
@@ -32,6 +33,12 @@ main:
     call printf
     ; FLOAD: FR1 = 3.141593
     mov dword [rel freg+1*4], 0x40490FDA           ; FR1 = 3.141593
+    ; PRINT_FLOAT:  R1 = ?
+    mov rcx, float_format        ; First parameter: format string
+    movss xmm0, [rel freg+1*4]    ; second param 
+    cvtss2sd xmm0, xmm0  
+    movq rdx, xmm0   
+    call printf
 ; compiler generated code --end---------------------------------------
     mov dword [rel reg + 4], 999  ; reg[1] = 1 (each element is 4 bytes, offset is 4)
     ; Call printf to output reg[0]

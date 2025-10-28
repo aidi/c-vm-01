@@ -60,7 +60,8 @@ Instruction instructions[INST_MAX] = {
     {MOV, 3, 1},    // R3=>c = a ，让c的初始值等于 a
     {ADD, 3, 2},    // R3=>c = c + b , 此时 c 等于 a+b
     {PRINT_INT, 3}, // 打印 R3寄存器 也就是 c 的值
-    {FLOAD, 1,  {.src_float = 3.1415926f}}, // 
+    {FLOAD, 1,  {.src_float = 3.1415926f}}, // R1=>a = 3.1415926
+    {PRINT_FLOAT, 1}, // 打印浮点数寄存器的值
     {EXIT, 0},      // 退出执行
 };
 
@@ -166,8 +167,8 @@ Instruction instructions2[INST_MAX] = {
     {FLOAD, 1, {.src_float = 100.0f}},  // FR1 = 100.0
     {FLOAD, 2, {.src_float = 99.0f}},   // FR2 = 99.0
     {FMOV, 3, {.src = 1}},     // FR3 = FR1
-      {FADD, 3, {.src = 2}},     // FR3 = FR3 + FR2
-      {PRINT_FLOAT, 3, {.src = 0}}, // 打印浮点数加法结果
+    {FADD, 3, {.src = 2}},     // FR3 = FR3 + FR2
+    {PRINT_FLOAT, 3, {.src = 0}}, // 打印浮点数加法结果
     {ASSERT_FLOAT, 3, {.src_float = 199.0f}}, // 断言FR3的值为199.0
     
     // 测试浮点数减法
@@ -443,6 +444,7 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
     }
     fprintf(fp, "section  .data\n");
     fprintf(fp, "    int_format db \"%%d\", 10, 0  ; Format string for printf\n");
+    fprintf(fp, "    float_format db \"%%f\", 10, 0  ; Format string for printf\n");
     fprintf(fp, "    freg times 256 dd 0.0 \n");
     
     fprintf(fp,"section .bss\n");
@@ -499,6 +501,15 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
                 fprintf(fp,"    ; PRINT_INT:  R%d = ?\n", insts[i].dest);
                 fprintf(fp,"    mov rcx, int_format        ; First parameter: format string\n");
                 fprintf(fp,"    mov edx, [rel reg+%d*4]    ; second param \n",insts[i].dest);
+                fprintf(fp,"    call printf\n");
+                break;
+            case PRINT_FLOAT:
+                // 最简单的加载方式
+                fprintf(fp,"    ; PRINT_FLOAT:  R%d = ?\n", insts[i].dest);
+                fprintf(fp,"    mov rcx, float_format        ; First parameter: format string\n");
+                fprintf(fp,"    movss xmm0, [rel freg+%d*4]    ; second param \n",insts[i].dest);
+                fprintf(fp,"    cvtss2sd xmm0, xmm0  \n");
+                fprintf(fp,"    movq rdx, xmm0   \n");
                 fprintf(fp,"    call printf\n");
                 break;
             default:

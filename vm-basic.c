@@ -60,6 +60,7 @@ Instruction instructions[INST_MAX] = {
     {MOV, 3, 1},    // R3=>c = a ，让c的初始值等于 a
     {ADD, 3, 2},    // R3=>c = c + b , 此时 c 等于 a+b
     {PRINT_INT, 3}, // 打印 R3寄存器 也就是 c 的值
+    {FLOAD, 1,  {.src_float = 3.1415926f}}, // 
     {EXIT, 0},      // 退出执行
 };
 
@@ -441,10 +442,12 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
         return;
     }
     fprintf(fp, "section  .data\n");
-    fprintf(fp, "    format db \"%%d\", 10, 0  ; Format string for printf\n");
+    fprintf(fp, "    int_format db \"%%d\", 10, 0  ; Format string for printf\n");
+    fprintf(fp, "    freg times 256 dd 0.0 \n");
     
     fprintf(fp,"section .bss\n");
     fprintf(fp,"    reg resd 8 ; Reserve space for 8 double words (4 bytes each)\n");
+    
 
     fprintf(fp, "section .text\n");
     fprintf(fp,"    extern printf           ; Declare external printf function\n");
@@ -456,7 +459,7 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
 
     fprintf(fp,"    mov dword [rel reg + 4], 666  ; reg[1] = 1 (each element is 4 bytes, offset is 4)\n");
     fprintf(fp,"    ; Call printf to output reg[0]\n");
-    fprintf(fp,"    mov rcx, format        ; First parameter: format string\n");
+    fprintf(fp,"    mov rcx, int_format        ; First parameter: format string\n");
     fprintf(fp,"    mov edx, dword [rel reg+4*1]  ; Second parameter: value of reg[1]\n");
     fprintf(fp,"    call printf\n");
     // compiler 
@@ -469,6 +472,12 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
                 fprintf(fp,"    ; LOAD: R%d = %d\n", insts[i].dest, insts[i].src);
                 fprintf(fp, "    mov dword [rel reg+%d*4], %d           ; R%d = %d\n", 
                         insts[i].dest, insts[i].src, insts[i].dest, insts[i].src);
+                break;
+            case FLOAD:
+                // 最简单的加载方式
+                fprintf(fp,"    ; FLOAD: FR%d = %f\n", insts[i].dest, insts[i].src_float);
+                fprintf(fp, "    mov dword [rel freg+%d*4], 0x%08X           ; FR%d = %f\n", 
+                        insts[i].dest, insts[i].src, insts[i].dest, insts[i].src_float);
                 break;
             case MOV:
                 // 最简单的加载方式
@@ -488,7 +497,7 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
             case PRINT_INT:
                 // 最简单的加载方式
                 fprintf(fp,"    ; PRINT_INT:  R%d = ?\n", insts[i].dest);
-                fprintf(fp,"    mov rcx, format        ; First parameter: format string\n");
+                fprintf(fp,"    mov rcx, int_format        ; First parameter: format string\n");
                 fprintf(fp,"    mov edx, [rel reg+%d*4]    ; second param \n",insts[i].dest);
                 fprintf(fp,"    call printf\n");
                 break;
@@ -505,7 +514,7 @@ void NasmWin64Output(Instruction insts[], int count, char *filename) {
     //999 end 
     fprintf(fp,"    mov dword [rel reg + 4], 999  ; reg[1] = 1 (each element is 4 bytes, offset is 4)\n");
     fprintf(fp,"    ; Call printf to output reg[0]\n");
-    fprintf(fp,"    mov rcx, format        ; First parameter: format string\n");
+    fprintf(fp,"    mov rcx, int_format        ; First parameter: format string\n");
     fprintf(fp,"    mov edx, dword [rel reg+4*1]  ; Second parameter: value of reg[1]\n");
     fprintf(fp,"    call printf\n");
 

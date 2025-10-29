@@ -1,6 +1,7 @@
 section  .data
     int_format db "%d", 10, 0  ; Format string for printf
     float_format db "%f", 10, 0  ; Format string for printf
+    hello_vm_basic db "hello vm-basic", 10, 0  ; Format string for printf
     freg times 256 dd 0.0 
 section .bss
     reg resd 8 ; Reserve space for 8 double words (4 bytes each)
@@ -10,6 +11,8 @@ section .text
 main:
     push rbp                ; Save caller's base pointer
     mov rbp, rsp            ; Set current function's base pointer
+    mov rcx, hello_vm_basic  ; First parameter: format string
+    call printf
     mov dword [rel reg + 4], 666  ; reg[1] = 1 (each element is 4 bytes, offset is 4)
     ; Call printf to output reg[0]
     mov rcx, int_format        ; First parameter: format string
@@ -21,12 +24,12 @@ main:
     ; LOAD: R2 = 99
     mov dword [rel reg+2*4], 99           ; R2 = 99
     ; MOV: R3 = R1
-    mov eax, [rel reg+1*4]    ; 先加载到寄存器
-    mov [rel reg+3*4], eax    ; 再从寄存器存储
+    mov eax, [rel reg+1*4]    ; eax=R1 
+    mov [rel reg+3*4], eax    ; R3=eax
     ; ADD: R3 = R3 + R2
-    mov eax, [rel reg+3*4]    ; 先加载到寄存器
-    add eax, [rel reg+2*4]    ; 再从寄存器存储
-    mov [rel reg+3*4], eax    ; 再从寄存器存储
+    mov eax, [rel reg+3*4]    ; eax=R3 
+    add eax, [rel reg+2*4]    ; eax=eax+R2 
+    mov [rel reg+3*4], eax    ; R3=eax
     ; PRINT_INT:  R3 = ?
     mov rcx, int_format        ; First parameter: format string
     mov edx, [rel reg+3*4]    ; second param 
